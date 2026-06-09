@@ -13,22 +13,46 @@ import {
   Coffee,
   Palette,
   Code,
-  Users
+  Users,
+  LogOut
 } from 'lucide-react';
-import { TimeEntry, Streak, Category } from './types';
+import { TimeEntry, Streak, Category, UserSession } from './types';
 import { DEFAULTS, SEED_ENTRIES } from './data';
 import DigitalTimer from './components/DigitalTimer';
 import SessionList from './components/SessionList';
 import StatsDashboard from './components/StatsDashboard';
 import StreakDisplay from './components/StreakDisplay';
+import WorkplaceSystem from './components/WorkplaceSystem';
+import AuthGateway from './components/AuthGateway';
 import { playClick } from './components/SoundEngine';
 
 export default function App() {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [activeCategoryId, setActiveCategoryId] = useState<string>('design');
-  const [activeTab, setActiveTab] = useState<'timer' | 'history' | 'stats'>('timer');
+  const [activeTab, setActiveTab] = useState<'timer' | 'history' | 'stats' | 'workplace'>('timer');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [streak, setStreak] = useState<Streak>({ currentStreak: 0, lastTrackedDate: null });
+  
+  const [session, setSession] = useState<UserSession | null>(() => {
+    const saved = localStorage.getItem('clikko_session');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const handleLogin = (newSession: UserSession) => {
+    setSession(newSession);
+    localStorage.setItem('clikko_session', JSON.stringify(newSession));
+    if (newSession.role === 'Staff') {
+      setActiveTab('timer');
+    } else {
+      setActiveTab('workplace');
+    }
+  };
+
+  const handleLogout = () => {
+    if (soundEnabled) playClick();
+    setSession(null);
+    localStorage.removeItem('clikko_session');
+  };
 
   // Load from LocalStorage
   useEffect(() => {
@@ -138,7 +162,7 @@ export default function App() {
     }
   };
 
-  const handleTabChange = (target: 'timer' | 'history' | 'stats') => {
+  const handleTabChange = (target: 'timer' | 'history' | 'stats' | 'workplace') => {
     if (soundEnabled) playClick();
     setActiveTab(target);
   };
@@ -147,8 +171,13 @@ export default function App() {
   const getHeaderBreadcrumb = () => {
     if (activeTab === 'timer') return 'Dashboard';
     if (activeTab === 'history') return 'Time records Ledger';
-    return 'Performance insights';
+    if (activeTab === 'stats') return 'Performance insights';
+    return 'Secure Workplace Terminal';
   };
+
+  if (!session) {
+    return <AuthGateway onLogin={handleLogin} soundEnabled={soundEnabled} />;
+  }
 
   return (
     <div className="w-full min-h-screen bg-[#F8FAFC] flex text-slate-800 font-sans select-none overflow-x-hidden">
@@ -209,6 +238,18 @@ export default function App() {
           >
             <BarChart3 size={16} />
             <span>Analytics Workspace</span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('workplace')}
+            className={`w-full text-left text-xs font-bold px-4 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
+              activeTab === 'workplace'
+                ? 'text-white bg-slate-800 border-l-[3px] border-teal-500'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+            }`}
+          >
+            <Users size={16} />
+            <span>Workplace Hub</span>
           </button>
 
           {/* Quick streak banner inside sidebar */}
@@ -294,12 +335,23 @@ export default function App() {
           {/* User profile layout matching high-end design */}
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-              <span className="block text-xs font-bold text-slate-800">Alex Rivera</span>
-              <span className="block text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Lead Designer</span>
+              <span className="block text-xs font-bold text-slate-800">{session?.name}</span>
+              <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                {session?.role === 'SuperAdmin' ? 'Super Admin' : session?.role === 'SubAdmin' ? 'Sub-Admin' : 'Staff Member'}
+              </span>
             </div>
-            <div className="w-10 h-10 rounded-full bg-teal-50 text-teal-700 font-bold flex items-center justify-center text-sm border border-teal-200">
-              AR
+            <div className="w-10 h-10 rounded-full bg-teal-50 text-teal-700 font-bold flex items-center justify-center text-sm border border-teal-200 uppercase">
+              {session?.name.slice(0, 2).toUpperCase() || 'US'}
             </div>
+
+            {/* Logout session item */}
+            <button
+              onClick={handleLogout}
+              title="Logout Session"
+              className="p-2 text-slate-450 hover:text-rose-500 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+            >
+              <LogOut size={15} />
+            </button>
           </div>
         </div>
 
@@ -376,6 +428,19 @@ export default function App() {
                 <StatsDashboard entries={entries} categories={DEFAULTS} />
               </motion.div>
             )}
+
+            {activeTab === 'workplace' && (
+              <motion.div
+                key="workplace-view"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.18 }}
+                className="max-w-6xl mx-auto w-full"
+              >
+                <WorkplaceSystem soundEnabled={soundEnabled} session={session} />
+              </motion.div>
+            )}
           </AnimatePresence>
         </main>
 
@@ -409,6 +474,16 @@ export default function App() {
           >
             <BarChart3 size={18} />
             <span className="text-[9px] font-semibold tracking-wider font-display">Analytics</span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('workplace')}
+            className={`flex flex-col items-center gap-1 cursor-pointer transition-colors relative ${
+              activeTab === 'workplace' ? 'text-teal-400' : 'text-slate-400'
+            }`}
+          >
+            <Users size={18} />
+            <span className="text-[9px] font-semibold tracking-wider font-display">Workplace</span>
           </button>
         </nav>
 
